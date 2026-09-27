@@ -3,12 +3,17 @@ package com.projectSTS.ecommercerest.service.impl;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.projectSTS.ecommercerest.dto.ProductoDTO;
+import com.projectSTS.ecommercerest.exception.GlobalExceptionHandler.ResourceNotFoundException;
 import com.projectSTS.ecommercerest.mapper.ProductoMapper;
 import com.projectSTS.ecommercerest.model.Producto;
+import com.projectSTS.ecommercerest.pagination.PageInfoDTO;
 import com.projectSTS.ecommercerest.repository.ProductoRepository;
 import com.projectSTS.ecommercerest.service.ProductoService;
 
@@ -24,28 +29,45 @@ public class ProductoServiceImpl implements ProductoService{
 	}
 	
 	@Override
-	public List<Producto> obtenerTodos(){
-		return productoRepository.findAll();
-	}
-	
-	@Override
-	public Optional<Producto> obtenerPorId(Long id){
-		return productoRepository.findById(id);
-	}
-	
-	@Override
-    public Producto guardar(ProductoDTO productoDTO) {
-        Producto producto = productoMapper.toEntity(productoDTO);
-        return productoRepository.save(producto);
+	public PageInfoDTO<ProductoDTO> obtenerTodosPaginado(int page, int size) {
+        Page<Producto> paginaProductos = productoRepository.findAll(PageRequest.of(page, size));
+        return PageInfoDTO.parse(paginaProductos, productoMapper::toDTO);
     }
 	
 	@Override
-    public Optional<Producto> actualizar(Long id, ProductoDTO productoDTO) {
-        return productoRepository.findById(id).map(productoExistente -> {
-            productoExistente.setNombre(productoDTO.getNombre());
+    public ProductoDTO obtenerPorId(Long id) {
+        if (id <= 0) {
+            throw new ResourceNotFoundException("El ID " + id + " no es válido. Debe ser mayor a 0.");
+        }
+
+        Producto producto = productoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("El producto con ID " + id + " no existe."));
+
+        return productoMapper.toDTO(producto);
+    }
+	
+	@Override
+    public ProductoDTO guardar(ProductoDTO productoDTO) {
+		Producto producto = productoMapper.toEntity(productoDTO);
+        Producto guardado = productoRepository.save(producto);
+        return productoMapper.toDTO(guardado);
+    }
+	
+	@Override
+    public ProductoDTO actualizar(Long id, ProductoDTO productoDTO) {
+		if (id <= 0) {
+	        throw new ResourceNotFoundException("El ID " + id + " no es válido. Debe ser mayor a 0.");
+	    }
+		
+        Producto productoExistente = productoRepository.findById(id)
+        		.orElseThrow(() -> new ResourceNotFoundException("El producto con ID " + id + " no existe."));
+            
+        	productoExistente.setNombre(productoDTO.getNombre());
             productoExistente.setPrecio(productoDTO.getPrecio());
-            return productoRepository.save(productoExistente);
-        });
+            
+            Producto actualizado = productoRepository.save(productoExistente);
+            
+            return productoMapper.toDTO(actualizado);
     }
 	
 	@Override
